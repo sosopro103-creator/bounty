@@ -2,24 +2,55 @@ repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
--- SETTINGS (simplified & SkibX safe)
-local Setting = {
-    Team = "Pirates",
-    AttackDistance = 25,
-    Delay = 1.2,
-    Enabled = true
-}
+-- SETTINGS
+local Enabled = false
+local AttackDistance = 25
+local Delay = 1.2
 
--- Auto team
-pcall(function()
-    if LocalPlayer.Team and LocalPlayer.Team.Name ~= Setting.Team then
-        for _,v in pairs(getgc(true)) do
-            if type(v) == "table" and rawget(v,"ChangeTeam") then
-                v.ChangeTeam(Setting.Team)
-            end
-        end
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "StatusGui"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.18, 0.08)
+frame.Position = UDim2.fromScale(0.05, 0.15)
+frame.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Name = "Main"
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0.25, 0)
+
+local text = Instance.new("TextLabel", frame)
+text.Size = UDim2.fromScale(1, 1)
+text.BackgroundTransparency = 1
+text.Text = "AUTO: OFF"
+text.TextScaled = true
+text.Font = Enum.Font.GothamBold
+text.TextColor3 = Color3.new(1,1,1)
+
+-- Toggle function
+local function toggle()
+    Enabled = not Enabled
+    if Enabled then
+        frame.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        text.Text = "AUTO: ON"
+    else
+        frame.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        text.Text = "AUTO: OFF"
+    end
+end
+
+-- Tap to toggle (Android friendly)
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        toggle()
     end
 end)
 
@@ -28,7 +59,7 @@ local function getChar()
     return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 end
 
--- Get closest player
+-- Find closest target
 local function getTarget()
     local char = getChar()
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -42,7 +73,7 @@ local function getTarget()
             local hum = plr.Character:FindFirstChild("Humanoid")
             if ehrp and hum and hum.Health > 0 then
                 local d = (ehrp.Position - hrp.Position).Magnitude
-                if d < Setting.AttackDistance and d < dist then
+                if d < AttackDistance and d < dist then
                     dist = d
                     closest = plr
                 end
@@ -53,25 +84,15 @@ local function getTarget()
     return closest
 end
 
--- Attack (simple)
+-- Auto attack loop
 task.spawn(function()
-    while task.wait(Setting.Delay) do
-        if not Setting.Enabled then continue end
-
+    while task.wait(Delay) do
+        if not Enabled then continue end
         local target = getTarget()
-        if target and target.Character then
+        if target then
             pcall(function()
                 mouse1click()
             end)
         end
-    end
-end)
-
--- Toggle with P
-game:GetService("UserInputService").InputBegan:Connect(function(i,g)
-    if g then return end
-    if i.KeyCode == Enum.KeyCode.P then
-        Setting.Enabled = not Setting.Enabled
-        warn("Auto Attack:", Setting.Enabled)
     end
 end)
