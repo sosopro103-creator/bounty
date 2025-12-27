@@ -1,81 +1,67 @@
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
 
 -- SETTINGS
 local Enabled = false
-local AttackDistance = 25
-local Delay = 1.2
+local LockDistance = 500
+local AimPart = "HumanoidRootPart" -- or "Head"
+local Smoothness = 0.15
 
 -- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "StatusGui"
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "AimLockGui"
 gui.ResetOnSpawn = false
-gui.Parent = game:GetService("CoreGui")
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.fromScale(0.18, 0.08)
-frame.Position = UDim2.fromScale(0.05, 0.15)
+frame.Position = UDim2.fromScale(0.05, 0.25)
 frame.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
-frame.Name = "Main"
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0.25, 0)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0.25,0)
 
-local text = Instance.new("TextLabel", frame)
-text.Size = UDim2.fromScale(1, 1)
-text.BackgroundTransparency = 1
-text.Text = "AUTO: OFF"
-text.TextScaled = true
-text.Font = Enum.Font.GothamBold
-text.TextColor3 = Color3.new(1,1,1)
+local label = Instance.new("TextLabel", frame)
+label.Size = UDim2.fromScale(1,1)
+label.BackgroundTransparency = 1
+label.Text = "AIM: OFF"
+label.Font = Enum.Font.GothamBold
+label.TextScaled = true
+label.TextColor3 = Color3.new(1,1,1)
 
--- Toggle function
-local function toggle()
-    Enabled = not Enabled
-    if Enabled then
-        frame.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        text.Text = "AUTO: ON"
-    else
-        frame.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        text.Text = "AUTO: OFF"
-    end
-end
-
--- Tap to toggle (Android friendly)
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        toggle()
+-- Toggle
+frame.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch then
+        Enabled = not Enabled
+        if Enabled then
+            frame.BackgroundColor3 = Color3.fromRGB(0,170,0)
+            label.Text = "AIM: ON"
+        else
+            frame.BackgroundColor3 = Color3.fromRGB(200,0,0)
+            label.Text = "AIM: OFF"
+        end
     end
 end)
 
--- Character
-local function getChar()
-    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-end
-
--- Find closest target
+-- Get closest player to center
 local function getTarget()
-    local char = getChar()
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
     local closest, dist = nil, math.huge
+    local camPos = Camera.CFrame.Position
 
     for _,plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character then
-            local ehrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            local part = plr.Character:FindFirstChild(AimPart)
             local hum = plr.Character:FindFirstChild("Humanoid")
-            if ehrp and hum and hum.Health > 0 then
-                local d = (ehrp.Position - hrp.Position).Magnitude
-                if d < AttackDistance and d < dist then
+            if part and hum and hum.Health > 0 then
+                local d = (part.Position - camPos).Magnitude
+                if d < LockDistance and d < dist then
                     dist = d
-                    closest = plr
+                    closest = part
                 end
             end
         end
@@ -84,15 +70,14 @@ local function getTarget()
     return closest
 end
 
--- Auto attack loop
-task.spawn(function()
-    while task.wait(Delay) do
-        if not Enabled then continue end
-        local target = getTarget()
-        if target then
-            pcall(function()
-                mouse1click()
-            end)
-        end
+-- Aim lock loop
+RunService.RenderStepped:Connect(function()
+    if not Enabled then return end
+
+    local target = getTarget()
+    if target then
+        local camCF = Camera.CFrame
+        local targetCF = CFrame.new(camCF.Position, target.Position)
+        Camera.CFrame = camCF:Lerp(targetCF, Smoothness)
     end
 end)
